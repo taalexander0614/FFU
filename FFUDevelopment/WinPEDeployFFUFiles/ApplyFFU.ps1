@@ -544,14 +544,17 @@ Else {
         try {
             $driverUpdateScript = Join-Path $USBDrive + "Drivers\automateddriverupdate.ps1"
             $driverUpdateOutput = & powershell.exe -ExecutionPolicy Bypass -File $driverUpdateScript 2>&1
+        }
+        catch {
+            WriteLog "Auto Driver Tool Failed - LastExitCode = $LASTEXITCODE also check dism.log on the USB drive for more info"
+            Write-Warning "Auto Driver Tool Failed - LastExitCode = $LASTEXITCODE also check dism.log on the USB drive for more info"
+        }
+        if ($null -ne $driverUpdateOutput) {
             # Write each line, that isn't blank, to the log file
             $driverUpdateOutput = $driverUpdateOutput -notmatch '^\s*$'
             foreach ($line in $driverUpdateOutput) {
                 WriteLog $line
             }
-        }
-        catch {
-            WriteLog "Failed to apply drivers - LastExitCode = $LASTEXITCODE also check dism.log on the USB drive for more info"
         }
     }
     else {
