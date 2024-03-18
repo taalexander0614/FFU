@@ -378,49 +378,6 @@ else {
     Writelog 'No PPKG files found or PPKG not selected.'
 }
 
-#Find Drivers
-$Drivers = $USBDrive + "Drivers"
-If (Test-Path -Path $Drivers)
-{
-    #Check if multiple driver folders found, if so, just select one folder to save time/space
-    $DriverFolders = Get-ChildItem -Path $Drivers -directory
-    $DriverFoldersCount = $DriverFolders.count
-    If ($DriverFoldersCount -gt 1)
-    {
-        WriteLog "Found $DriverFoldersCount driver folders"
-        $array = @()
-
-        for($i=0; $i -le $DriverFoldersCount -1; $i++){
-        $Properties = [ordered]@{Number = $i + 1; Drivers = $DriverFolders[$i].FullName}
-        $array += New-Object PSObject -Property $Properties
-        }
-    $array | Format-Table -AutoSize -Property Number, Drivers
-    do {
-        try {
-            $var = $true
-            [int]$DriversSelected = Read-Host 'Enter the set of drivers to install'
-            $DriversSelected = $DriversSelected - 1
-        }
-
-        catch {
-            Write-Host 'Input was not in correct format. Please enter a valid driver folder number'
-            $var = $false
-        }
-    } until (($DriversSelected -le $DriverFoldersCount -1) -and $var) 
-
-    $Drivers = $array[$DriversSelected].Drivers
-    WriteLog "$Drivers was selected"
-    }
-    elseif ($DriverFoldersCount -eq 1) {
-        WriteLog "Found $DriverFoldersCount driver folder"
-        $Drivers = $DriverFolders.FullName
-        WriteLog "$Drivers will be installed"
-    } 
-    else {
-        Writelog 'No driver folders found'
-    }
-}
-
 #If you want to enable battery level checking, uncomment the line below as well as the Get-Battery function near the top of the script
 #Get-Battery
 
@@ -567,14 +524,32 @@ If ($computername){
     }   
 }
 
-#Add Drivers
-#Some drivers can sometimes fail to copy and dism ends up with a non-zero error code. Invoke-process will throw and terminate in these instances. 
+#Find and Add Drivers
+$deviceModel = Get-WmiObject -Class Win32_ComputerSystem | Select-Object -ExpandProperty Model
+$Drivers = $USBDrive + "Drivers\$deviceModel"
 If (Test-Path -Path $Drivers)
 {
     WriteLog 'Copying drivers'
     Write-Warning 'Copying Drivers - dism will pop a window with no progress. This can take a few minutes to complete. This is done so drivers are logged to the scriptlog.txt file. Please be patient.'
+    #Some drivers can sometimes fail to copy and dism ends up with a non-zero error code. Invoke-process will throw and terminate in these instances. 
     Invoke-process dism.exe "/image:W:\ /Add-Driver /Driver:""$Drivers"" /Recurse"
     WriteLog 'Copying drivers succeeded'
+}
+Else {
+    # Run MSIntuneDriverUpdate.ps1 and capture output to $driverUpdateOutput
+    WriteLog -Level 'Running Automated Driver Script'
+    try {
+        $driverUpdateScript = Join-Path $USBDrive + "Drivers\automateddriverupdate.ps1"
+        $driverUpdateOutput = & powershell.exe -ExecutionPolicy Bypass -File $driverUpdateScript 2>&1
+        # Write each line, that isn't blank, to the log file
+        $driverUpdateOutput = $driverUpdateOutput -notmatch '^\s*$'
+        foreach ($line in $driverUpdateOutput) {
+            WriteLog $line
+        }
+    }
+    catch {
+        WriteLog "Failed to apply drivers - LastExitCode = $LASTEXITCODE also check dism.log on the USB drive for more info"
+    }
 }
 
 #Copy DISM log to USBDrive

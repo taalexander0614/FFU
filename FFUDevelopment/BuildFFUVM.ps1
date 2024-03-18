@@ -1481,10 +1481,10 @@ Function New-DeploymentUSB {
                     robocopy $(Split-Path $SelectedFFUFile -Parent) $DeployPartitionDriveLetter $(Split-Path $SelectedFFUFile -Leaf) /COPYALL /R:5 /W:5 /J
                 }
                 #Copy drivers using robocopy due to potential size
-                if ($CopyDrivers) {
-                    WriteLog "Copying drivers to $DeployPartitionDriveLetter\Drivers"
-                    robocopy "$FFUDevelopmentPath\Drivers" "$DeployPartitionDriveLetter\Drivers" /E /R:5 /W:5 /J
-                }
+                #Removed if statement so I could ensure automated driver tool is always copied
+                #If drivers placed in this folder they need to be in a folder named to match "$deviceModel = Get-WmiObject -Class Win32_ComputerSystem | Select-Object -ExpandProperty Model"
+                WriteLog "Copying drivers to $DeployPartitionDriveLetter\Drivers"
+                robocopy "$FFUDevelopmentPath\Drivers" "$DeployPartitionDriveLetter\Drivers" /E /R:5 /W:5 /J
                 #Copy Unattend folder in the FFU folder to the USB drive. Can use copy-item as it's a small folder
                 if ($CopyUnattend) {
                     WriteLog "Copying Unattend folder to $DeployPartitionDriveLetter"
