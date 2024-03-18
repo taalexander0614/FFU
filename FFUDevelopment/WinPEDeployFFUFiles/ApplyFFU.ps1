@@ -536,19 +536,26 @@ If (Test-Path -Path $Drivers)
     WriteLog 'Copying drivers succeeded'
 }
 Else {
-    # Run MSIntuneDriverUpdate.ps1 and capture output to $driverUpdateOutput
-    WriteLog -Level 'Running Automated Driver Script'
-    try {
-        $driverUpdateScript = Join-Path $USBDrive + "Drivers\automateddriverupdate.ps1"
-        $driverUpdateOutput = & powershell.exe -ExecutionPolicy Bypass -File $driverUpdateScript 2>&1
-        # Write each line, that isn't blank, to the log file
-        $driverUpdateOutput = $driverUpdateOutput -notmatch '^\s*$'
-        foreach ($line in $driverUpdateOutput) {
-            WriteLog $line
+    # Check for internet connection
+    $Internet = Test-Connection -ComputerName www.microsoft.com -Count 1 -Quiet
+    if ($Internet){
+        # Run MSIntuneDriverUpdate.ps1 and capture output to $driverUpdateOutput
+        WriteLog -Level 'Running Automated Driver Script'
+        try {
+            $driverUpdateScript = Join-Path $USBDrive + "Drivers\automateddriverupdate.ps1"
+            $driverUpdateOutput = & powershell.exe -ExecutionPolicy Bypass -File $driverUpdateScript 2>&1
+            # Write each line, that isn't blank, to the log file
+            $driverUpdateOutput = $driverUpdateOutput -notmatch '^\s*$'
+            foreach ($line in $driverUpdateOutput) {
+                WriteLog $line
+            }
+        }
+        catch {
+            WriteLog "Failed to apply drivers - LastExitCode = $LASTEXITCODE also check dism.log on the USB drive for more info"
         }
     }
-    catch {
-        WriteLog "Failed to apply drivers - LastExitCode = $LASTEXITCODE also check dism.log on the USB drive for more info"
+    else {
+        WriteLog 'No drivers found on USB drive and no internet connection. Exiting'
     }
 }
 
