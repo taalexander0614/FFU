@@ -390,8 +390,7 @@ try {
     $Disk | clear-disk -RemoveData -RemoveOEM -Confirm:$false
 }
 catch {
-    WriteLog "Cleaning disk failed, error: $_."
-    WriteLog 'Exiting'
+    WriteLog "Cleaning disk failed, exiting. Error: $_."
     throw $_
 }
 
