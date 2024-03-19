@@ -1,6 +1,8 @@
+# Possibly add "old" to end of existing ffu file name, copy the new one, then verify the new one is there before deleting the old one
+
 $Win10_Folder = "C:\FFU_Test_Copy"
 $Win11_Folder = "C:\FFU_Test_Copy"
-$PackageIDs = @("PackageID1", "PackageID2", "PackageID3")
+$PackageIDs = @("Win10_PkgID", "Win11PkgID")
 $SCCMServer = "ANXSCCM"
 $SCCMSiteCode = "101"
 
@@ -15,6 +17,8 @@ if (!(Test-Path -Path $Win11_Folder)){
     New-Item -Path $Win11_Folder -ItemType Directory
 }
 $DestinationPath = Join-Path -Path $Win11_Folder -ChildPath $Win11_FFU.Name
+# Remove any existing FFU files
+Remove-Item -Path "$Win11_Folder\*.ffu" -Force
 Copy-Item -Path $Win11_FFU.FullName -Destination $DestinationPath -Force
 
 
@@ -29,6 +33,8 @@ if (!(Test-Path -Path $Win10_Folder)){
     New-Item -Path $Win10_Folder -ItemType Directory
 }
 $DestinationPath = Join-Path -Path $Win10_Folder -ChildPath $Win10_FFU.Name
+# Remove any existing FFU files
+Remove-Item -Path "$Win10_Folder\*.ffu" -Force
 Copy-Item -Path $Win10_FFU.FullName -Destination $DestinationPath -Force
 
 <#

@@ -17,9 +17,10 @@ function Get-USBDrive(){
 # Run applyffu.ps1 located on the root of the USB drive and wait for it to complete
 $USBDriveLetter = Get-USBDrive
 $ApplyFFUPath = $USBDriveLetter + "ApplyFFU.ps1"
+Read-Host "Running $ApplyFFUPath"
 Write-Host "Running $ApplyFFUPath"
-Start-Process powershell -ArgumentList "-ExecutionPolicy "Bypass" -File $ApplyFFjsonPath" -Wait
-
+Start-Process powershell -ArgumentList "-ExecutionPolicy "Bypass" -File $ApplyFFUPath" -Wait
+Read-Host "Finished running $ApplyFFUPath"
 
 
 
