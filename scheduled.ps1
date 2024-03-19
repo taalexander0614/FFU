@@ -17,3 +17,19 @@ Write-Host "Copying Windows 10 FFU to share"
 $LatestFFUFile = Get-ChildItem -Path "C:\FFUDevelopment\FFU" -Filter "Win10*.ffu" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 #Copy-Item -Path $LatestFFUFile.FullName -Destination "\\ANXSCCM\OperatingSystems" -Force
 Copy-Item -Path $LatestFFUFile.FullName -Destination "C:\FFU_Test_Copy" -Force
+
+# Update package containing FFU files on SCCM distribution points
+<#
+### Want to do something like this, but need to figure out how to do it
+
+Write-Host "Updating SCCM package with FFU files"
+$packageIDs = @("ANX00001", "ANX00002")
+foreach ($packageID in $packageIDs){
+    $Get_WmiObject = @{
+        'Namespace' = 'root\SMS\Site_ANX';
+        'Class' = 'SMS_Package';
+        'Filter' = "PackageID='$packageID'";
+    }
+    (Get-Wmiobject @Get_WmiObject).Commit() | Out-null
+}
+#>
