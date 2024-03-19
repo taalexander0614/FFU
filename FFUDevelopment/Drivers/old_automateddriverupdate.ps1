@@ -28,10 +28,6 @@
 
 # // =================== GLOBAL VARIABLES ====================== //
 
-function global:WriteLog($LogText){ 
-    Add-Content -path $LogFile -value "$((Get-Date).ToString()) $LogText"
-}
-
 function Get-USBDrive(){
     $USBDriveLetter = (Get-Volume | Where-Object {$_.DriveType -eq 'Removable' -and $_.FileSystemType -eq 'NTFS'}).DriveLetter
     if ($null -eq $USBDriveLetter){
@@ -48,29 +44,8 @@ function Get-USBDrive(){
     return $USBDriveLetter
 }
 
-$USBDrive = Get-USBDrive
-# LogFile
-$logFIle = Join-Path $USBDrive "Invoke-MSIntuneDriverUpdate.log"
-if (Test-Path -Path $LogFile) {
-	Remove-Item -Path $LogFile
-}
-
 # Set Temp & Log Location
 [string]$TempDirectory = Join-Path $USBDrive "\DriverTemp"
-
-# Set Temp & Log Location
-[string]$TempDirectory = Join-Path $TempLocation "\Temp"
-[string]$LogDirectory = Join-Path $TempLocation "\Logs"
-
-# Create Temp Folder 
-if ((Test-Path -Path $TempDirectory) -eq $false) {
-	New-Item -Path $TempDirectory -ItemType Dir
-}
-
-# Create Logs Folder 
-if ((Test-Path -Path $LogDirectory) -eq $false) {
-	New-Item -Path $LogDirectory -ItemType Dir
-}
 
 # // =================== DELL VARIABLES ================ //
 
@@ -134,7 +109,7 @@ $global:LenovoSystemSKU = $null
 
 # Determine manufacturer
 $ComputerManufacturer = (Get-WmiObject -Class Win32_ComputerSystem | Select-Object -ExpandProperty Manufacturer).Trim()
-WriteLog "Manufacturer determined as: $($ComputerManufacturer)"
+Write-Output "Manufacturer determined as: $($ComputerManufacturer)"
 
 # Determine manufacturer name and hardware information
 switch -Wildcard ($ComputerManufacturer) {
@@ -159,10 +134,10 @@ switch -Wildcard ($ComputerManufacturer) {
 		$SystemSKU = ((Get-CIMInstance -ClassName MS_SystemInformation -NameSpace root\WMI | Select-Object -ExpandProperty BIOSVersion).SubString(0, 4)).Trim()
 	}
 }
-WriteLog "Computer model determined as: $($ComputerModel)"
+Write-Output "Computer model determined as: $($ComputerModel)"
 
 if (-not [string]::IsNullOrEmpty($SystemSKU)) {
-	WriteLog "Computer SKU determined as: $($SystemSKU)"
+	Write-Output "Computer SKU determined as: $($SystemSKU)"
 }
 
 # Get operating system name from version
@@ -177,7 +152,7 @@ switch -wildcard (Get-WmiObject -Class Win32_OperatingSystem | Select-Object -Ex
 		$OSName = "Windows 7"
 	}
 }
-WriteLog "Operating system determined as: $OSName"
+Write-Output "Operating system determined as: $OSName"
 
 # Get operating system architecture
 switch -wildcard ((Get-CimInstance Win32_operatingsystem).OSArchitecture) {
@@ -189,30 +164,30 @@ switch -wildcard ((Get-CimInstance Win32_operatingsystem).OSArchitecture) {
 	}
 }
 
-WriteLog "Architecture determined as: $OSArchitecture"
+Write-Output "Architecture determined as: $OSArchitecture"
 
 $WindowsVersion = ($OSName).Split(" ")[1]
 
-function DownloadDriverList {
-	WriteLog "======== Download Model Link Information ========"
+function Invoke-DriverListDownload {
+	Write-Output "======== Download Model Link Information ========"
 	if ($ComputerManufacturer -eq "Hewlett-Packard") {
 		if ((Test-Path -Path $TempDirectory\$HPCabFile) -eq $false) {
-			WriteLog "======== Downloading HP Product List ========"
+			Write-Output "======== Downloading HP Product List ========"
 			# Download HP Model Cabinet File
-			WriteLog "Info: Downloading HP driver pack cabinet file from $HPXMLCabinetSource"
+			Write-Output "Info: Downloading HP driver pack cabinet file from $HPXMLCabinetSource"
 			try {
 				Start-BitsTransfer -Source $HPXMLCabinetSource -Destination $TempDirectory
 				# Expand Cabinet File
-				WriteLog "Info: Expanding HP driver pack cabinet file: $HPXMLFile"
+				Write-Output "Info: Expanding HP driver pack cabinet file: $HPXMLFile"
 				Expand "$TempDirectory\$HPCabFile" -F:* "$TempDirectory\$HPXMLFile"
 			}
 			catch {
-				WriteLog "Error: $($_.Exception.Message)"
+				Write-Output "Error: $($_.Exception.Message)" 
 			}
 		}
 		# Read XML File
 		if ($null -eq $global:HPModelSoftPaqs) {
-			WriteLog "Info: Reading driver pack XML file - $TempDirectory\$HPXMLFile"
+			Write-Output "Info: Reading driver pack XML file - $TempDirectory\$HPXMLFile"
 			[xml]$global:HPModelXML = Get-Content -Path $TempDirectory\$HPXMLFile
 			# Set XML Object
 			$global:HPModelXML.GetType().FullName | Out-Null
@@ -221,22 +196,22 @@ function DownloadDriverList {
 	}
 	if ($ComputerManufacturer -eq "Dell") {
 		if ((Test-Path -Path $TempDirectory\$DellCabFile) -eq $false) {
-			WriteLog "Info: Downloading Dell product list"
-			WriteLog "Info: Downloading Dell driver pack cabinet file from $DellXMLCabinetSource"
+			Write-Output "Info: Downloading Dell product list"
+			Write-Output "Info: Downloading Dell driver pack cabinet file from $DellXMLCabinetSource"
 			# Download Dell Model Cabinet File
 			try {
 				Start-BitsTransfer -Source $DellXMLCabinetSource -Destination $TempDirectory
 				# Expand Cabinet File
-				WriteLog "Info: Expanding Dell driver pack cabinet file: $DellXMLFile"
+				Write-Output "Info: Expanding Dell driver pack cabinet file: $DellXMLFile"
 				Expand "$TempDirectory\$DellCabFile" -F:* "$TempDirectory\$DellXMLFile"
 			}
 			catch {
-				WriteLog "Error: $($_.Exception.Message)"
+				Write-Output "Error: $($_.Exception.Message)" 
 			}
 		}
 		if ($null -eq $DellModelXML) {
 			# Read XML File
-			WriteLog "Info: Reading driver pack XML file - $TempDirectory\$DellXMLFile"
+			Write-Output "Info: Reading driver pack XML file - $TempDirectory\$DellXMLFile"
 			[xml]$DellModelXML = (Get-Content -Path $TempDirectory\$DellXMLFile)
 			# Set XML Object
 			$DellModelXML.GetType().FullName | Out-Null
@@ -250,11 +225,11 @@ function DownloadDriverList {
 				[xml]$global:LenovoModelXML = Invoke-WebRequest -Uri $global:LenovoXMLSource
 			}
 			catch {
-				WriteLog "Error: $($_.Exception.Message)"
+				Write-Output "Error: $($_.Exception.Message)" 
 			}
 			
 			# Read Web Site
-			WriteLog "Info: Reading driver pack URL - $global:LenovoXMLSource"
+			Write-Output "Info: Reading driver pack URL - $global:LenovoXMLSource"
 			
 			# Set XML Object 
 			$global:LenovoModelXML.GetType().FullName | Out-Null
@@ -263,90 +238,7 @@ function DownloadDriverList {
 	}
 }
 
-function FindLenovoDriver {
-	
-<#
- # This powershell file will extract the link for the specified driver pack or application
- # param $URI The string version of the URL
- # param $64bit A boolean to determine what version to pick if there are multiple
- # param $os A string containing 7, 8, or 10 depending on the os we are deploying 
- #           i.e. 7, Win7, Windows 7 etc are all valid os strings
- #>
-	param (
-		[parameter(Mandatory = $true, HelpMessage = "Provide the URL to parse.")]
-		[ValidateNotNullOrEmpty()]
-		[string]
-		$URI,
-		[parameter(Mandatory = $true, HelpMessage = "Specify the operating system.")]
-		[ValidateNotNullOrEmpty()]
-		[string]
-		$OS,
-		[string]
-		$Architecture
-	)
-	
-	#Case for direct link to a zip file
-	if ($URI.EndsWith(".zip")) {
-		return $URI
-	}
-	
-	$err = @()
-	
-	#Get the content of the website
-	try {
-		$html = Invoke-WebRequest –Uri $URI
-	}
-	catch {
-		WriteLog "Error: $($_.Exception.Message)"
-	}
-	
-	#Create an array to hold all the links to exe files
-	$Links = @()
-	$Links.Clear()
-	
-	#determine if the URL resolves to the old download location
-	if ($URI -like "*olddownloads*") {
-		#Quickly grab the links that end with exe
-		$Links = (($html.Links | Where-Object {
-					$_.href -like "*exe"
-				}) | Where-Object class -eq "downloadBtn").href
-	}
-	
-	$Links = ((Select-string '(http[s]?)(:\/\/)([^\s,]+.exe)(?=")' -InputObject ($html).Rawcontent -AllMatches).Matches.Value)
-	
-	if ($Links.Count -eq 0) {
-		return $null
-	}
-	
-	# Switch OS architecture
-	switch -wildcard ($Architecture) {
-		"*64*" {
-			$Architecture = "64"
-		}
-		"*86*" {
-			$Architecture = "32"
-		}
-	}
-	
-	#if there are multiple links then narrow down to the proper arc and os (if needed)
-	if ($Links.Count -gt 0) {
-		#Second array of links to hold only the ones we want to target
-		$MatchingLink = @()
-		$MatchingLink.clear()
-		foreach ($Link in $Links) {
-			if ($Link -like "*w$($OS)$($Architecture)_*" -or $Link -like "*w$($OS)_$($Architecture)*") {
-				$MatchingLink += $Link
-			}
-		}
-	}
-	
-	if ($null -ne $MatchingLink) {
-		return $MatchingLink
-	}
-	else {
-		return "badLink"
-	}
-}
+
 
 function Get-RedirectedUrl {
 	Param (
@@ -382,7 +274,7 @@ function LenovoModelTypeFinder {
 		if ($null -eq $global:LenovoModelDrivers) {
 			[xml]$global:LenovoModelXML = Invoke-WebRequest -Uri $global:LenovoXMLSource
 			# Read Web Site
-			WriteLog "Info: Reading driver pack URL - $global:LenovoXMLSource"
+			Write-Output "Info: Reading driver pack URL - $global:LenovoXMLSource"
 			
 			# Set XML Object
 			$global:LenovoModelXML.GetType().FullName | Out-Null
@@ -390,16 +282,16 @@ function LenovoModelTypeFinder {
 		}
 	}
 	catch {
-		WriteLog "Error: $($_.Exception.Message)"
+		Write-Output "Error: $($_.Exception.Message)" 
 	}
 	
 	if ($ComputerModel.Length -gt 0) {
 		$global:LenovoModelType = ($global:LenovoModelDrivers.Product | Where-Object {
 				$_.Queries.Version -match "$ComputerModel"
-			}).Queries.Types | Select -ExpandProperty Type | Select-Object -first 1
+			}).Queries.Types | Select-Object -ExpandProperty Type | Select-Object -first 1
 		$global:LenovoSystemSKU = ($global:LenovoModelDrivers.Product | Where-Object {
 				$_.Queries.Version -match "$ComputerModel"
-			}).Queries.Types | select -ExpandProperty Type | Get-Unique
+			}).Queries.Types | Select-Object -ExpandProperty Type | Get-Unique
 	}
 	
 	if ($ComputerModelType.Length -gt 0) {
@@ -410,7 +302,7 @@ function LenovoModelTypeFinder {
 	Return $global:LenovoModelType
 }
 
-function InitiateDownloads {
+function Invoke-DriverDownload {
 	
 	$Product = "Intune Driver Automation"
 	
@@ -431,13 +323,13 @@ function InitiateDownloads {
 			Start-BitsTransfer -DisplayName "$ComputerModel-DriverDownload" -Source $DriverDownloadURL -Destination "$($TempDirectory + '\Driver Cab\' + $DriverCab)"
 		}
 		catch [System.Exception] {
-			WriteLog "Error: $($_.Exception.Message)"
+			Write-Output "Error: $($_.Exception.Message)" 
 		}
 	}
 	
-	WriteLog "======== Starting Download Processes ========"
-	WriteLog "Info: Operating System specified: Windows $($WindowsVersion)"
-	WriteLog "Info: Operating System architecture specified: $($OSArchitecture)"
+	Write-Output "======== Starting Download Processes ========"
+	Write-Output "Info: Operating System specified: Windows $($WindowsVersion)"
+	Write-Output "Info: Operating System architecture specified: $($OSArchitecture)"
 	
 	# Operating System Version
 	$OperatingSystem = ("Windows " + $($WindowsVersion))
@@ -457,15 +349,15 @@ function InitiateDownloads {
 			$OSBuild = "1607"
 		}
 	}
-	WriteLog "Info: Windows 10 build $OSBuild identified for driver match"
+	Write-Output "Info: Windows 10 build $OSBuild identified for driver match"
 	
 	# Start driver import processes
-	WriteLog "Info: Starting Download,Extract And Import Processes For $ComputerManufacturer Model: $($ComputerModel)"
+	Write-Output "Info: Starting Download,Extract And Import Processes For $ComputerManufacturer Model: $($ComputerModel)"
 	
 	# =================== DEFINE VARIABLES =====================
 	
 	if ($ComputerManufacturer -eq "Dell") {
-		WriteLog "Info: Setting Dell variables"
+		Write-Output "Info: Setting Dell variables"
 		if ($null -eq $DellModelCabFiles) {
 			[xml]$DellModelXML = Get-Content -Path $TempDirectory\$DellXMLFile
 			# Set XML Object
@@ -473,7 +365,7 @@ function InitiateDownloads {
 			$DellModelCabFiles = $DellModelXML.driverpackmanifest.driverpackage
 		}
 		if ($null -ne $SystemSKU) {
-			WriteLog "Info: SystemSKU value is present, attempting match based on SKU - $SystemSKU)"
+			Write-Output "Info: SystemSKU value is present, attempting match based on SKU - $SystemSKU)"
 			
 			$ComputerModelURL = $DellDownloadBase + "/" + ($DellModelCabFiles | Where-Object {
 					((($_.SupportedOperatingSystems).OperatingSystem).osCode -like "*$WindowsVersion*") -and ($_.SupportedSystems.Brand.Model.SystemID -eq $SystemSKU)
@@ -487,7 +379,7 @@ function InitiateDownloads {
 					}).path).Split("/") | Select-Object -Last 1
 		}
 		elseif ($null -eq $SystemSKU -or $null -eq $DriverCab) {
-			WriteLog "Info: Falling back to matching based on model name"
+			Write-Output "Info: Falling back to matching based on model name"
 			
 			$ComputerModelURL = $DellDownloadBase + "/" + ($DellModelCabFiles | Where-Object {
 					((($_.SupportedOperatingSystems).OperatingSystem).osCode -like "*$WindowsVersion*") -and ($_.SupportedSystems.Brand.Model.Name -like "*$ComputerModel*")
@@ -507,10 +399,10 @@ function InitiateDownloads {
 		if ($DellSystemSKU.count -gt 1) {
 			$DellSystemSKU = [string]($DellSystemSKU -join ";")
 		}
-		WriteLog "Info: Dell System Model ID is : $DellSystemSKU"
+		Write-Output "Info: Dell System Model ID is : $DellSystemSKU"
 	}
 	if ($ComputerManufacturer -eq "Hewlett-Packard") {
-		WriteLog "Info: Setting HP variables"
+		Write-Output "Info: Setting HP variables"
 		if ($null -eq $global:HPModelSoftPaqs) {
 			[xml]$global:HPModelXML = Get-Content -Path $TempDirectory\$HPXMLFile
 			# Set XML Object
@@ -539,13 +431,13 @@ function InitiateDownloads {
 			$DriverRevision = "$($HPSoftPaqDetails.Version)"
 		}
 		else{
-			WriteLog "Unsupported model / operating system combination found. Exiting."
+			Write-Output "Unsupported model / operating system combination found. Exiting." ; exit 1
 		}
 	}
 	if ($ComputerManufacturer -eq "Lenovo") {
-		WriteLog "Info: Setting Lenovo variables"
+		Write-Output "Info: Setting Lenovo variables"
 		$global:LenovoModelType = LenovoModelTypeFinder -ComputerModel $ComputerModel -OS $WindowsVersion
-		WriteLog "Info: $ComputerManufacturer $ComputerModel matching model type: $global:LenovoModelType"
+		Write-Output "Info: $ComputerManufacturer $ComputerModel matching model type: $global:LenovoModelType"
 		
 		if ($null -ne $global:LenovoModelDrivers) {
 			[xml]$global:LenovoModelXML = (New-Object System.Net.WebClient).DownloadString("$global:LenovoXMLSource")
@@ -566,15 +458,15 @@ function InitiateDownloads {
 						$_.id -eq "SCCM"
 					})."#text"
 			}
-			WriteLog "Info: Model URL determined as $ComputerModelURL"
+			Write-Output "Info: Model URL determined as $ComputerModelURL"
 			$DriverDownload = FindLenovoDriver -URI $ComputerModelURL -os $WindowsVersion -Architecture $OSArchitecture
 			If ($null -ne $DriverDownload) {
 				$DriverCab = $DriverDownload | Split-Path -Leaf
 				$DriverRevision = ($DriverCab.Split("_") | Select-Object -Last 1).Trim(".exe")
-				WriteLog "Info: Driver cabinet download determined as $DriverDownload"
+				Write-Output "Info: Driver cabinet download determined as $DriverDownload"
 			}
 			else {
-				WriteLog "Error: Unable to find driver for $Make $Model"
+				Write-Output "Error: Unable to find driver for $Make $Model"
 			}
 		}
 	}
@@ -582,15 +474,15 @@ function InitiateDownloads {
 	# Driver location variables
 	$DriverSourceCab = ($TempDirectory + "\Driver Cab\" + $DriverCab)
 	$DriverExtractDest = ("$TempDirectory" + "\Driver Files")
-	WriteLog "Info: Driver extract location set - $DriverExtractDest"
+	Write-Output "Info: Driver extract location set - $DriverExtractDest"
 	
 	# =================== INITIATE DOWNLOADS ===================			
 	
-	WriteLog "======== $Product - $ComputerManufacturer $ComputerModel DRIVER PROCESSING STARTED ========"
+	Write-Output "======== $Product - $ComputerManufacturer $ComputerModel DRIVER PROCESSING STARTED ========"
 	
 	# =============== ConfigMgr Driver Cab Download =================				
-	WriteLog "$($Product): Retrieving ConfigMgr driver pack site For $ComputerManufacturer $ComputerModel"
-	WriteLog "$($Product): URL found: $ComputerModelURL"
+	Write-Output "$($Product): Retrieving ConfigMgr driver pack site For $ComputerManufacturer $ComputerModel"
+	Write-Output "$($Product): URL found: $ComputerModelURL"
 	
 	if (($null -ne $ComputerModelURL) -and ($DriverDownload -ne "badLink")) {
 		# Cater for HP / Model Issue
@@ -602,25 +494,25 @@ function InitiateDownloads {
 			if ((Test-Path -Path $($TempDirectory + "\Driver Cab")) -eq $false) {
 				New-Item -ItemType Directory -Path $($TempDirectory + "\Driver Cab")
 			}
-			WriteLog "$($Product): Downloading $DriverCab driver cab file"
-			WriteLog "$($Product): Downloading from URL: $DriverDownload"
+			Write-Output "$($Product): Downloading $DriverCab driver cab file"
+			Write-Output "$($Product): Downloading from URL: $DriverDownload"
 			Start-Job -Name "$ComputerModel-DriverDownload" -ScriptBlock $DriverDownloadJob -ArgumentList ($TempDirectory, $ComputerModel, $DriverCab, $DriverDownload)
-			sleep -Seconds 5
+			Start-Sleep -Seconds 5
 			$BitsJob = Get-BitsTransfer | Where-Object {
 				$_.DisplayName -match "$ComputerModel-DriverDownload"
 			}
 			while (($BitsJob).JobState -eq "Connecting") {
-				WriteLog "$($Product): Establishing connection to $DriverDownload"
-				sleep -seconds 30
+				Write-Output "$($Product): Establishing connection to $DriverDownload"
+				Start-Sleep -seconds 30
 			}
 			while (($BitsJob).JobState -eq "Transferring") {
-				if ($BitsJob.BytesTotal -ne $null) {
+				if ($null -ne $BitsJob.BytesTotal) {
 					$PercentComplete = [int](($BitsJob.BytesTransferred * 100)/$BitsJob.BytesTotal);
-					WriteLog "$($Product): Downloaded $([int]((($BitsJob).BytesTransferred)/ 1MB)) MB of $([int]((($BitsJob).BytesTotal)/ 1MB)) MB ($PercentComplete%). Next update in 30 seconds."
-					sleep -seconds 30
+					Write-Output "$($Product): Downloaded $([int]((($BitsJob).BytesTransferred)/ 1MB)) MB of $([int]((($BitsJob).BytesTotal)/ 1MB)) MB ($PercentComplete%). Next update in 30 seconds."
+					Start-Sleep -seconds 30
 				}
 				else {
-					WriteLog "$($Product): Download issues detected. Cancelling download process"
+					Write-Output "$($Product): Download issues detected. Cancelling download process" -Severity 2
 					Get-BitsTransfer | Where-Object {
 						$_.DisplayName -eq "$ComputerModel-DriverDownload"
 					} | Remove-BitsTransfer
@@ -629,74 +521,74 @@ function InitiateDownloads {
 			Get-BitsTransfer | Where-Object {
 				$_.DisplayName -eq "$ComputerModel-DriverDownload"
 			} | Complete-BitsTransfer
-			WriteLog "$($Product): Driver revision: $DriverRevision"
+			Write-Output "$($Product): Driver revision: $DriverRevision"
 		}
 		else {
-			WriteLog "$($Product): Skipping $DriverCab. Driver pack already downloaded."
+			Write-Output "$($Product): Skipping $DriverCab. Driver pack already downloaded."
 		}
 		
 		# Cater for HP / Model Issue
 		$ComputerModel = $ComputerModel -replace '/', '-'
 		
 		if (((Test-Path -Path "$($TempDirectory + '\Driver Cab\' + $DriverCab)") -eq $true) -and ($null -ne $DriverCab)) {
-			WriteLog "$($Product): $DriverCab File exists - Starting driver update process"
+			Write-Output "$($Product): $DriverCab File exists - Starting driver update process"
 			# =============== Extract Drivers =================
 			
 			if ((Test-Path -Path "$DriverExtractDest") -eq $false) {
 				New-Item -ItemType Directory -Path "$($DriverExtractDest)"
 			}
 			if ((Get-ChildItem -Path "$DriverExtractDest" -Recurse -Filter *.inf -File).Count -eq 0) {
-				WriteLog "==================== $PRODUCT DRIVER EXTRACT ===================="
-				WriteLog "$($Product): Expanding driver CAB source file: $DriverCab"
-				WriteLog "$($Product): Driver CAB destination directory: $DriverExtractDest"
+				Write-Output "==================== $PRODUCT DRIVER EXTRACT ===================="
+				Write-Output "$($Product): Expanding driver CAB source file: $DriverCab"
+				Write-Output "$($Product): Driver CAB destination directory: $DriverExtractDest"
 				if ($ComputerManufacturer -eq "Dell") {
-					WriteLog "$($Product): Extracting $ComputerManufacturer drivers to $DriverExtractDest"
+					Write-Output "$($Product): Extracting $ComputerManufacturer drivers to $DriverExtractDest"
 					Expand "$DriverSourceCab" -F:* "$DriverExtractDest"
 				}
 				if ($ComputerManufacturer -eq "Hewlett-Packard") {
-					WriteLog "$($Product): Extracting $ComputerManufacturer drivers to $HPTemp"
+					Write-Output "$($Product): Extracting $ComputerManufacturer drivers to $HPTemp"
 					# Driver Silent Extract Switches
 					$HPSilentSwitches = "-PDF -F" + "$DriverExtractDest" + " -S -E"
-					WriteLog "$($Product): Using $ComputerManufacturer silent switches: $HPSilentSwitches"
+					Write-Output "$($Product): Using $ComputerManufacturer silent switches: $HPSilentSwitches"
 					Start-Process -FilePath "$($TempDirectory + '\Driver Cab\' + $DriverCab)" -ArgumentList $HPSilentSwitches -Verb RunAs
 					$DriverProcess = ($DriverCab).Substring(0, $DriverCab.length - 4)
 					
 					# Wait for HP SoftPaq Process To Finish
 					While ((Get-Process).name -contains $DriverProcess) {
-						WriteLog "$($Product): Waiting for extract process (Process: $DriverProcess) to complete..  Next check in 30 seconds"
-						sleep -Seconds 30
+						Write-Output "$($Product): Waiting for extract process (Process: $DriverProcess) to complete..  Next check in 30 seconds"
+						Start-Sleep -Seconds 30
 					}
 				}
 				if ($ComputerManufacturer -eq "Lenovo") {
 					# Driver Silent Extract Switches
 					$global:LenovoSilentSwitches = "/VERYSILENT /DIR=" + '"' + $DriverExtractDest + '"' + ' /Extract="Yes"'
-					WriteLog "$($Product): Using $ComputerManufacturer silent switches: $global:LenovoSilentSwitches"
-					WriteLog "$($Product): Extracting $ComputerManufacturer drivers to $DriverExtractDest"
+					Write-Output "$($Product): Using $ComputerManufacturer silent switches: $global:LenovoSilentSwitches"
+					Write-Output "$($Product): Extracting $ComputerManufacturer drivers to $DriverExtractDest"
 					Unblock-File -Path $($TempDirectory + '\Driver Cab\' + $DriverCab)
 					Start-Process -FilePath "$($TempDirectory + '\Driver Cab\' + $DriverCab)" -ArgumentList $global:LenovoSilentSwitches -Verb RunAs
 					$DriverProcess = ($DriverCab).Substring(0, $DriverCab.length - 4)
 					# Wait for Lenovo Driver Process To Finish
 					While ((Get-Process).name -contains $DriverProcess) {
-						WriteLog "$($Product): Waiting for extract process (Process: $DriverProcess) to complete..  Next check in 30 seconds"
-						sleep -seconds 30
+						Write-Output "$($Product): Waiting for extract process (Process: $DriverProcess) to complete..  Next check in 30 seconds"
+						Start-Sleep -seconds 30
 					}
 				}
 			}
 			else {
-				WriteLog "Skipping. Drivers already extracted."
+				Write-Output "Skipping. Drivers already extracted."
 			}
 		}
 		else {
-			WriteLog "$($Product): $DriverCab file download failed"
+			Write-Output "$($Product): $DriverCab file download failed" 
 		}
 	}
 	elseif ($DriverDownload -eq "badLink") {
-		WriteLog "$($Product): Operating system driver package download path not found.. Skipping $ComputerModel"
+		Write-Output "$($Product): Operating system driver package download path not found.. Skipping $ComputerModel" 
 	}
 	else {
-		WriteLog "$($Product): Driver package not found for $ComputerModel running Windows $WindowsVersion $Architecture. Skipping $ComputerModel"
+		Write-Output "$($Product): Driver package not found for $ComputerModel running Windows $WindowsVersion $Architecture. Skipping $ComputerModel" -Severity 2
 	}
-	WriteLog "======== $PRODUCT - $ComputerManufacturer $ComputerModel DRIVER PROCESSING FINISHED ========"
+	Write-Output "======== $PRODUCT - $ComputerManufacturer $ComputerModel DRIVER PROCESSING FINISHED ========"
 	
 	
 	if ($ValidationErrors -eq 0) {
@@ -704,42 +596,45 @@ function InitiateDownloads {
 	}
 }
 
-function Update-Drivers {
+function Invoke-DriverUpdate {
 	$DriverPackagePath = Join-Path $TempDirectory "Driver Files"
-	WriteLog "Driver package location is $DriverPackagePath"
-	WriteLog "Starting driver installation process"
-	WriteLog "Reading drivers from $DriverPackagePath"
+	Write-Output "Driver package location is $DriverPackagePath"
+	Write-Output "Starting driver installation process"
+	Write-Output "Reading drivers from $DriverPackagePath"
 	# Apply driver maintenance package
 	try {
 		if ((Get-ChildItem -Path $DriverPackagePath -Filter *.inf -Recurse).count -gt 0) {
 			try {
-				Start-Process "$env:WINDIR\sysnative\windowspowershell\v1.0\powershell.exe" -WorkingDirectory $DriverPackagePath -ArgumentList "pnputil /add-driver *.inf /subdirs /install | Out-File -FilePath (Join-Path $LogDirectory '\Install-Drivers.txt') -Append" -NoNewWindow -Wait
-				WriteLog "Driver installation complete. Restart required"
+				Start-Process powershell.exe -WorkingDirectory $DriverPackagePath -ArgumentList "dism /Image:W:\ /Add-Driver /Driver:*.inf /Recurse | Out-File -FilePath (Join-Path $LogDirectory '\Install-Drivers.txt') -Append" -NoNewWindow -Wait
+				#Start-Process "$env:WINDIR\sysnative\windowspowershell\v1.0\powershell.exe" -WorkingDirectory $DriverPackagePath -ArgumentList "dism /Image:W:\ /Add-Driver /Driver:*.inf /Recurse | Out-File -FilePath (Join-Path $LogDirectory '\Install-Drivers.txt') -Append" -NoNewWindow -Wait
+				Write-Output "Driver installation complete. Restart required"
+				Return "success"
 			}
 			catch [System.Exception]
 			{
-				WriteLog "An error occurred while attempting to apply the driver maintenance package. Error message: $($_.Exception.Message)"
+				Write-Output "An error occurred while attempting to apply the driver maintenance package. Error message: $($_.Exception.Message)" ; exit 1
 			}
 		}
 		else {
-			WriteLog "No driver inf files found in $DriverPackagePath."
+			Write-Output "No driver inf files found in $DriverPackagePath." ; exit 1
 		}
 	}
 	catch [System.Exception] {
-		WriteLog "An error occurred while attempting to apply the driver maintenance package. Error message: $($_.Exception.Message)"
+		Write-Output "An error occurred while attempting to apply the driver maintenance package. Error message: $($_.Exception.Message)" ; exit 1
 	}
-	WriteLog "Finished driver maintenance."
-	Return $LastExitCode
+	Write-Output "Finished driver maintenance."
+	#Return $LastExitCode
 }
 
-if ($OSName -eq "Windows 10") {
+
+#if ($OSName -eq "Windows 10") {
 	# Download manufacturer lists for driver matching
-	DownloadDriverList
+	Invoke-DriverListDownload
 	# Initiate matched downloads
-	InitiateDownloads
+	Invoke-DriverDownload
 	# Update driver repository and install drivers
-	Update-Drivers
-}
-else {
-	WriteLog "An upsupported OS was detected. This script only supports Windows 10."
-}
+	Invoke-DriverUpdate
+#}
+#else {
+#	Write-Output "An upsupported OS was detected. This script only supports Windows 10." ; exit 1
+#}
