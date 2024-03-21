@@ -1,10 +1,7 @@
-# Possibly add "old" to end of existing ffu file name, copy the new one, then verify the new one is there before deleting the old one
-
 $Win10_Folder = "C:\FFU_Test_Copy"
 $Win11_Folder = "C:\FFU_Test_Copy"
 $SiteCode = "101" # Site code 
 $ProviderMachineName = "anxsccm.rcs.local" # SMS Provider machine name
-# Customizations
 $initParams = @{}
 #$initParams.Add("Verbose", $true) # Uncomment this line to enable verbose logging
 #$initParams.Add("ErrorAction", "Stop") # Uncomment this line to stop the script on any errors
@@ -19,11 +16,32 @@ $Win11_FFU = Get-ChildItem -Path "C:\FFUDevelopment\FFU" -Filter "Win11*.ffu" | 
 if (!(Test-Path -Path $Win11_Folder)){
     New-Item -Path $Win11_Folder -ItemType Directory
 }
-$DestinationPath = Join-Path -Path $Win11_Folder -ChildPath $Win11_FFU.Name
-# Remove any existing FFU files
-Remove-Item -Path "$Win11_Folder\*.ffu" -Force
-Copy-Item -Path $Win11_FFU.FullName -Destination $DestinationPath -Force
+if ($Win11_FFU) {
+    $oldWin11_FFU = Get-ChildItem -Path $Win11_Folder -Filter "Win10*.ffu"
+    if ($null -eq $oldWin11_FFU) {
+        Write-Host "No FFU files found, no need to rename"
+    }
+    else {
+        foreach ($file in $oldWin11_FFU) {
+            Rename-Item -Path $file.FullName -NewName "old_$($file.Name)"
+        }
+    }
+    
+    # Copy new FFU file to share
+    $DestinationPath = Join-Path -Path $Win11_Folder -ChildPath $Win11_FFU.Name
+    Copy-Item -Path $Win11_FFU.FullName -Destination $DestinationPath -Force
 
+    # Verify new ffu file is in place
+    if (Test-Path $DestinationPath) {
+        Write-Host "New FFU file successfully copied."
+        # If new file copied successfully, delete the old ones
+        Remove-Item -Path "$Win11_Folder\old_*.ffu" -Force
+    }
+    else {
+        Write-Host "Failed to copy new FFU file. Exiting script."
+        # Optionally add error handling or exit script if copying failed
+    }
+}
 
 # Create Windows 10 FFU
 Write-Host "Creating Windows 10 FFU"
@@ -35,10 +53,32 @@ $Win10_FFU = Get-ChildItem -Path "C:\FFUDevelopment\FFU" -Filter "Win10*.ffu" | 
 if (!(Test-Path -Path $Win10_Folder)){
     New-Item -Path $Win10_Folder -ItemType Directory
 }
-$DestinationPath = Join-Path -Path $Win10_Folder -ChildPath $Win10_FFU.Name
-# Remove any existing FFU files
-Remove-Item -Path "$Win10_Folder\*.ffu" -Force
-Copy-Item -Path $Win10_FFU.FullName -Destination $DestinationPath -Force
+if ($Win10_FFU) {
+    $oldWin10_FFU = Get-ChildItem -Path $Win10_Folder -Filter "Win10*.ffu"
+    if ($null -eq $oldWin10_FFU) {
+        Write-Host "No FFU files found, no need to rename"
+    }
+    else {
+        foreach ($file in $oldWin10_FFU) {
+            Rename-Item -Path $file.FullName -NewName "old_$($file.Name)"
+        }
+    }
+    
+    # Copy new FFU file to share
+    $DestinationPath = Join-Path -Path $Win10_Folder -ChildPath $Win10_FFU.Name
+    Copy-Item -Path $Win10_FFU.FullName -Destination $DestinationPath -Force
+
+    # Verify new ffu file is in place
+    if (Test-Path $DestinationPath) {
+        Write-Host "New FFU file successfully copied."
+        # If new file copied successfully, delete the old ones
+        Remove-Item -Path "$Win10_Folder\old_*.ffu" -Force
+    }
+    else {
+        Write-Host "Failed to copy new FFU file. Exiting script."
+        # Optionally add error handling or exit script if copying failed
+    }
+}
 
 <#
 # Import the ConfigurationManager.psd1 module 
