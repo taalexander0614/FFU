@@ -19,7 +19,7 @@ $USBDriveLetter = Get-USBDrive
 $ApplyFFUPath = $USBDriveLetter + "ApplyFFU.ps1"
 Read-Host "Running $ApplyFFUPath"
 Write-Host "Running $ApplyFFUPath"
-Start-Process powershell -ArgumentList "-ExecutionPolicy "Bypass" -File $ApplyFFUPath" -Wait
+Start-Process powershell -ArgumentList "-ExecutionPolicy "Bypass" -File $ApplyFFUPath" -NoNewWindow -Wait
 Read-Host "Finished running $ApplyFFUPath"
 
 
