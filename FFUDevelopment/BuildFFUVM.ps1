@@ -166,6 +166,7 @@ Command line for those who want to download the latest Windows 11 Pro x64 media 
 
 .NOTES
     Additional notes about your script.
+    # .\BuildFFUVM.ps1 -WindowsSKU 'Pro' -Installapps $true -InstallOffice $true -VMSwitchName 'FFU' -VMHostIPAddress '192.168.1.107' -CreateCaptureMedia $true -CreateDeploymentMedia $true -BuildUSBDrive $true -UpdateLatestCU $true -UpdateLatestNet $true -UpdateLatestDefender $true -UpdateEdge $true -UpdateOneDrive $true -verbose
 
 .LINK
     https://github.com/rbalsleyMSFT/FFU
